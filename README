@@ -1,0 +1,9 @@
+Plugin Name: Breadcrumb
+Plugin URI: http://wordpressfire.com/
+Description: Breadcrumb maker and builder
+Author: Philip Joyner
+Version: 0.1
+Author URI: http://philipjoyner.com/
+Updated: 2011-03-07
+
+Creates breadcrumb for a given post or a given set of post slugs.
