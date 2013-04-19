@@ -6,7 +6,7 @@ Description: Breadcrumb maker and builder
 Author: Philip Joyner
 Version: 0.1
 Author URI: http://philipjoyner.com/
-Updated: 2010-11-18
+Updated: 2013-04-19
 */
 /*
 Creates breadcrumb for a given post
