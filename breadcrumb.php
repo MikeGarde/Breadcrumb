@@ -16,7 +16,7 @@ var 3 - $add_home - Add a link to the homepage into the breadcrumb from given ti
 var 4 - $needle - ID of page where breadcrumb should stop (not required)
 */
 if(!function_exists("breadcrumb")) {
-function breadcrumb($post=null, $sep='<span>/</span>', $add_home='Home', $post_cat_to_page=false, $post_type='page', $needle=null) {	
+function breadcrumb($post=null, $sep='<span class="sep">/</span>', $current='...', $add_home='Home', $post_cat_to_page=false, $post_type='page') {
 	if(!$post) return false;
 	global $wpdb;
 		
@@ -46,8 +46,7 @@ function breadcrumb($post=null, $sep='<span>/</span>', $add_home='Home', $post_c
 	}
 		
 	if($post) {
-		$ancestors = array();
-		if(isset($post->ancestors)) $ancestors = bc_parse_parents($post, $needle); else $ancestors = bc_get_parents($post, $needle);
+		$ancestors = (isset($post->ancestors)) ? bc_parse_parents($post, $post->ID) : bc_get_parents($post, $post->ID);
 
 		if($add_home) $crumbs[] = array('title' => $add_home, 'link' => get_bloginfo('siteurl'));
 		foreach($ancestors as $a) {
@@ -57,17 +56,20 @@ function breadcrumb($post=null, $sep='<span>/</span>', $add_home='Home', $post_c
 
 		if($crumbs) {
 			$total = count($crumbs) - 1;
+			$breadcrumb.= '<span itemscope itemtype="http://data-vocabulary.org/Breadcrumb">';
 			foreach($crumbs as $k => $crumb) {
 				$add = $crumb['title'];
-				if($k == $total && !$find_post)
-					$breadcrumb.= $add . $sep;
-				else
-					$breadcrumb.= bc_mk_link($crumb['link'], $add, array('alt' => $add), false) . $sep;
+				$breadcrumb.= bc_mk_link($crumb['link'], $add, array('alt' => $add), false) . $sep;
 			}
 			if($find_post) {
 				$breadcrumb.= $hp->post_title . $sep;
 			}
-			$breadcrumb = substr($breadcrumb, 0, (strlen($sep) * -1));
+			if($current) {
+				$breadcrumb.= $current;
+			} else {
+				$breadcrumb = substr($breadcrumb, 0, (strlen($sep) * -1));
+			}
+			$breadcrumb.= '</span>';
 		}
 		echo $breadcrumb;
 	}
@@ -75,22 +77,18 @@ function breadcrumb($post=null, $sep='<span>/</span>', $add_home='Home', $post_c
 }
 
 if(!function_exists("bc_parse_parents")) {
-function bc_parse_parents($post=null, $needle = null, $reverse = true) {
+function bc_parse_parents($post=null, $reverse = true) {
 	$key = null;
 	if($post && isset($post->ancestors) && $post->ancestors) {
 		$ancestors = $post->ancestors;
 		$total = count($ancestors);
+		
 		if($reverse) {
 			$ancestors = array_reverse($ancestors);
-			$ancestors[] = $post->ID;
-		}
-		if($needle) {
-			$key = array_search($needle, $ancestors) + 1;
-			if($key) $ancestors = array_slice($ancestors, $key, $total);
 		}
 		return $ancestors;
 	} else {
-		$ancestors = array_reverse(bc_get_parents($post, $needle));
+		$ancestors = array_reverse(bc_get_parents($post));
 		return $ancestors;
 	}
 }
@@ -99,9 +97,11 @@ function bc_parse_parents($post=null, $needle = null, $reverse = true) {
 
 if(!function_exists("bc_mk_link")) {
 function bc_mk_link($url=null, $title=null, $options=array(), $echo = true) {
+	$options['itemprop'] = 'url';
 	if(!stristr($url, 'http://')) $url = $this->site_url() . $url;
 	if(!$options['href']) $options['href'] = $url;
-	if($title) $_title = $title; else $_title = $url;
+	$_title = ($title) ? $title : $url;
+	$_title = '<span itemprop="title">'.$_title.'</span>';
 	$return = bc_tag('a', $options, true, $_title);
 	if($echo) echo $return; else return $return;
 }
@@ -140,17 +140,15 @@ function bc_make_options($options=array()) {
 
 
 if(!function_exists("bc_get_parents")) {
-function bc_get_parents($post = null, $needle=null, $keep_needle = true, $results = array(), $loop = true) {
+function bc_get_parents($post = null, $results = array(), $loop = true) {
 	global $wpdb;
 	if($post) {
 		$results[] = $post->ID;
 		$result = $wpdb->get_results("SELECT wpost.ID, wpost.post_parent FROM {$wpdb->posts} wpost WHERE wpost.ID={$post->post_parent} ORDER BY wpost.menu_order asc");
 		if(isset($result[0]->ID) && $loop) {
-			if($needle) if($result[0]->post_parent == $needle) $loop = false;
 			if(!$result[0]->post_parent) $loop = false;
-			$results = bc_get_parents($result[0], $needle, $keep_needle, $results, $loop);
+			$results = bc_get_parents($result[0], $results, $loop);
 		}
-		if(!$loop) if($keep_needle && ($post->post_parent == $needle)) $results[] = $needle;
 	}
 	return $results;
 }
@@ -158,7 +156,7 @@ function bc_get_parents($post = null, $needle=null, $keep_needle = true, $result
 	
 
 if(!function_exists("breadcrumb_build")) {	
-function breadcrumb_build($slugs = array(), $last=null, $sep='<span>/<span>', $home=false, $echo=true) {
+function breadcrumb_build($slugs = array(), $last=null, $sep='<span>/<span>', $home='Home', $echo=true) {
 	if(!$slugs || !is_array($slugs)) return;
 	global $dev;
 	global $wpdb;
@@ -173,7 +171,7 @@ function breadcrumb_build($slugs = array(), $last=null, $sep='<span>/<span>', $h
 		if($page) $breadcrumb.= '<a href="' . get_permalink($page->ID) . '">' . $page->post_title . '</a>' . $sep;
 	}
 	
-	if($last) $breadcrumb.= $last . $sep;
+	if($last) $breadcrumb.= $last;
 	
 	if($breadcrumb) {
 		$breadcrumb = substr($breadcrumb, 0, (strlen($sep) * -1));
@@ -182,4 +180,3 @@ function breadcrumb_build($slugs = array(), $last=null, $sep='<span>/<span>', $h
 	}
 }
 }
-?>
